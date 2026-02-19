@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Метеостанция ESP32</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+            padding: 10px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 15px;
+            background-color: #2c3e50;
+            color: white;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        /* Аккордеон для мобильного режима */
+        .accordion {
+            display: none;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .accordion.active {
+            display: block;
+        }
+
+        .accordion-button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background-color: #34495e;
+            color: white;
+            border: none;
+            text-align: left;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+
+        .accordion-button:hover {
+            background-color: #2c3e50;
+        }
+
+        .accordion-content {
+            padding: 15px;
+            background-color: white;
+            display: none;
+            border-radius: 5px;
+            margin-top: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .accordion-content.show {
+            display: block;
+        }
+
+        /* Сетка для планшетного режима */
+        .sensor-grid {
+            display: none;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .sensor-grid.active {
+            display: grid;
+        }
+
+        .sensor-zone {
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .sensor-zone:hover {
+            transform: translateY(-5px);
+        }
+
+        .zone-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .sensor-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .sensor-unit {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .zone-1 { background: linear-gradient(135deg, #3498db, #2980b9); }
+        .zone-2 { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .zone-3 { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+        .zone-4 { background: linear-gradient(135deg, #f39c12, #d35400); }
+        .zone-5 { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+        .zone-6 { background: linear-gradient(135deg, #1abc9c, #16a085); }
+
+        .mode-toggle {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .toggle-btn {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .toggle-btn:hover {
+            background-color: #2980b9;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        /* Мобильная версия */
+        @media screen and (max-width: 768px) {
+            .sensor-grid {
+                display: none;
+            }
+            
+            .accordion {
+                display: block;
+            }
+        }
+
+        /* Планшетная/десктопная версия */
+        @media screen and (min-width: 769px) {
+            .accordion {
+                display: none;
+            }
+            
+            .sensor-grid {
+                display: grid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Метеостанция ESP32</h1>
+        <p>Отслеживание погодных условий в реальном времени</p>
+    </div>
+
+    <div class="mode-toggle">
+        <button class="toggle-btn" id="modeToggle">Переключить режим отображения</button>
+    </div>
+
+    <!-- Аккордеон для мобильного режима -->
+    <div class="accordion active" id="accordionView">
+        <button class="accordion-button" onclick="toggleAccordion(0)">Температура</button>
+        <div class="accordion-content" id="content0">
+            <div class="sensor-value"><span id="tempValue">--</span><span class="sensor-unit"> °C</span></div>
+        </div>
+
+        <button class="accordion-button" onclick="toggleAccordion(1)">Влажность</button>
+        <div class="accordion-content" id="content1">
+            <div class="sensor-value"><span id="humValue">--</span><span class="sensor-unit"> %</span></div>
+        </div>
+
+        <button class="accordion-button" onclick="toggleAccordion(2)">Давление</button>
+        <div class="accordion-content" id="content2">
+            <div class="sensor-value"><span id="presValue">--</span><span class="sensor-unit"> hPa</span></div>
+        </div>
+
+        <button class="accordion-button" onclick="toggleAccordion(3)">Уровень света</button>
+        <div class="accordion-content" id="content3">
+            <div class="sensor-value"><span id="lightValue">--</span><span class="sensor-unit"> lux</span></div>
+        </div>
+    </div>
+
+    <!-- Сетка для планшетного режима -->
+    <div class="sensor-grid" id="gridView">
+        <div class="sensor-zone zone-1">
+            <div class="zone-title">Температура</div>
+            <div class="sensor-value"><span id="gTempValue">--</span><span class="sensor-unit"> °C</span></div>
+        </div>
+        
+        <div class="sensor-zone zone-2">
+            <div class="zone-title">Влажность</div>
+            <div class="sensor-value"><span id="gHumValue">--</span><span class="sensor-unit"> %</span></div>
+        </div>
+        
+        <div class="sensor-zone zone-3">
+            <div class="zone-title">Давление</div>
+            <div class="sensor-value"><span id="gPresValue">--</span><span class="sensor-unit"> hPa</span></div>
+        </div>
+        
+        <div class="sensor-zone zone-4">
+            <div class="zone-title">Уровень света</div>
+            <div class="sensor-value"><span id="gLightValue">--</span><span class="sensor-unit"> lux</span></div>
+        </div>
+        
+        <div class="sensor-zone zone-5">
+            <div class="zone-title">Ультрафиолет</div>
+            <div class="sensor-value"><span id="gUVValue">--</span><span class="sensor-unit"></span></div>
+        </div>
+        
+        <div class="sensor-zone zone-6">
+            <div class="zone-title">Шум</div>
+            <div class="sensor-value"><span id="gNoiseValue">--</span><span class="sensor-unit"> dB</span></div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Метеостанция ESP32 | Обновлено: <span id="updateTime">--:--:--</span>
+    </div>
+
+    <script>
+        // Переключение между режимами отображения
+        document.getElementById('modeToggle').addEventListener('click', function() {
+            const accordion = document.getElementById('accordionView');
+            const gridView = document.getElementById('gridView');
+            
+            if(accordion.classList.contains('active')) {
+                accordion.classList.remove('active');
+                gridView.classList.add('active');
+                this.textContent = 'Переключить в мобильный режим';
+            } else {
+                accordion.classList.add('active');
+                gridView.classList.remove('active');
+                this.textContent = 'Переключить в планшетный режим';
+            }
+        });
+
+        // Функция для работы аккордеона
+        function toggleAccordion(index) {
+            const content = document.getElementById(`content${index}`);
+            content.classList.toggle('show');
+        }
+
+        // Функция обновления данных с датчиков
+        function updateSensorData() {
+            // В реальной реализации эти данные будут приходить с ESP32 через AJAX запрос
+            // Здесь используем случайные значения для демонстрации
+            
+            // Генерация случайных значений для демонстрации
+            const temp = (20 + Math.random() * 10).toFixed(1);
+            const hum = (40 + Math.random() * 30).toFixed(1);
+            const pres = (1000 + Math.random() * 50).toFixed(1);
+            const light = Math.floor(Math.random() * 10000);
+            const uv = (Math.random() * 15).toFixed(1);
+            const noise = (30 + Math.random() * 40).toFixed(1);
+            
+            // Обновление значений в мобильном режиме
+            document.getElementById('tempValue').textContent = temp;
+            document.getElementById('humValue').textContent = hum;
+            document.getElementById('presValue').textContent = pres;
+            document.getElementById('lightValue').textContent = light;
+            
+            // Обновление значений в планшетном режиме
+            document.getElementById('gTempValue').textContent = temp;
+            document.getElementById('gHumValue').textContent = hum;
+            document.getElementById('gPresValue').textContent = pres;
+            document.getElementById('gLightValue').textContent = light;
+            document.getElementById('gUVValue').textContent = uv;
+            document.getElementById('gNoiseValue').textContent = noise;
+            
+            // Обновление времени
+            const now = new Date();
+            document.getElementById('updateTime').textContent = now.toLocaleTimeString();
+        }
+
+        // Обновляем данные каждые 5 секунд
+        setInterval(updateSensorData, 5000);
+        
+        // Инициализируем данные при загрузке
+        updateSensorData();
+        
+        // Обработка изменения размера окна для автоматического переключения режимов
+        window.addEventListener('resize', function() {
+            const accordion = document.getElementById('accordionView');
+            const gridView = document.getElementById('gridView');
+            const toggleBtn = document.getElementById('modeToggle');
+            
+            if(window.innerWidth < 769) {
+                accordion.classList.add('active');
+                gridView.classList.remove('active');
+                toggleBtn.textContent = 'Переключить в планшетный режим';
+            } else {
+                accordion.classList.remove('active');
+                gridView.classList.add('active');
+                toggleBtn.textContent = 'Переключить в мобильный режим';
+            }
+        });
+    </script>
+</body>
+</html>
